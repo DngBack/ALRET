@@ -1,0 +1,114 @@
+# Base configuration template for ALRET
+
+# Model configuration
+model:
+  name: "Qwen/Qwen2-0.5B-Instruct"  # Base model name
+  load_in_8bit: false
+  device: "cuda"
+  torch_dtype: "bfloat16"  # or "float16"
+  trust_remote_code: true
+
+# Data configuration
+data:
+  harmful_path: "data/processed/harmful_train.jsonl"
+  benign_path: "data/processed/benign_train.jsonl"
+  val_harmful: "data/processed/harmful_val.jsonl"
+  val_benign: "data/processed/benign_val.jsonl"
+  test_harmful: "data/processed/harmful_test.jsonl"
+  test_benign: "data/processed/benign_test.jsonl"
+  max_length: 512
+  num_harmful_train: 160
+  num_benign_train: 800
+  num_harmful_val: 20
+  num_benign_val: 100
+  num_harmful_test: 20
+  num_benign_test: 100
+
+# Training configuration
+training:
+  method: "alret"  # Options: "alret", "extended_refusal", "standard_ft"
+  batch_size: 4
+  grad_accumulation_steps: 4
+  num_steps: 500
+  learning_rate: 5.0e-6
+  warmup_steps: 50
+  weight_decay: 0.01
+  max_grad_norm: 1.0
+  fp16: false
+  bf16: true
+  seed: 42
+  save_strategy: "steps"
+  save_steps: 100
+  eval_steps: 50
+  logging_steps: 10
+
+# ALRET-specific configuration
+alret:
+  # Attacker configuration
+  attacker_type: "lora_weight"  # Options: "lora_weight", "directional", "mixed"
+  rank: 4  # Low-rank dimension
+  inner_steps: 3  # Number of inner optimization steps
+  inner_lr: 0.1  # Learning rate for inner attacker
+  gamma: 0.5  # Benign preservation weight
+  eta: 0.01  # Norm regularization penalty
+  
+  # Target layers and modules for attacks
+  target_layers: [8, 12, 16, 20]  # Mid-to-late layers
+  target_modules: ["self_attn.o_proj", "mlp.down_proj"]
+  
+  # Directional attacker specific
+  num_directions: 3
+  alpha_range: [0.0, 2.0]  # Ablation strength range
+  
+  # Loss weights
+  beta_kl: 0.1  # KL divergence weight for benign preservation
+  lambda_refusal: 0.5  # Weight for refusal NLL loss
+
+# Refusal classifier configuration
+refusal_classifier:
+  model_name: "distilbert-base-uncased"
+  checkpoint: "outputs/refusal_classifier/best.pt"
+  threshold: 0.5
+  batch_size: 32
+  train_samples: 500  # For training if needed
+
+# Evaluation configuration
+eval:
+  attack_ranks: [1, 2, 4, 8, 16]
+  num_attack_steps: 100
+  eval_batch_size: 8
+  generate_max_tokens: 50
+  temperature: 0.7
+  top_p: 0.9
+  do_sample: false
+
+# Metrics configuration
+metrics:
+  compute_intrinsic_dim: true
+  compute_participation_ratio: true
+  benign_utility_metric: "rouge"  # Options: "rouge", "gpt4_judge"
+  safety_rubric: true
+
+# Logging configuration
+logging:
+  use_wandb: true
+  wandb_project: "alret"
+  wandb_entity: null
+  output_dir: "outputs"
+  log_level: "info"
+  save_total_limit: 3
+
+# Extended refusal configuration (for baseline)
+extended_refusal:
+  num_refusal_variants: 10
+  refusal_templates:
+    - "I cannot assist with that request."
+    - "I'm unable to help with that."
+    - "I must decline to answer that."
+    - "That's not something I can help with."
+    - "I'm not able to provide assistance with that."
+    - "I cannot comply with that request."
+    - "I'm afraid I can't help with that."
+    - "That's outside my guidelines."
+    - "I cannot generate that content."
+    - "I must respectfully refuse."

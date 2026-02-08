@@ -1,0 +1,112 @@
+# Qwen2-0.5B-Instruct Extended Refusal Baseline Configuration
+
+# Model configuration
+model:
+  name: "Qwen/Qwen2-0.5B-Instruct"
+  load_in_8bit: false
+  device: "cuda"
+  torch_dtype: "bfloat16"
+  trust_remote_code: true
+
+# Data configuration
+data:
+  harmful_path: "data/processed/harmful_train.jsonl"
+  benign_path: "data/processed/benign_train.jsonl"
+  val_harmful: "data/processed/harmful_val.jsonl"
+  val_benign: "data/processed/benign_val.jsonl"
+  test_harmful: "data/processed/harmful_test.jsonl"
+  test_benign: "data/processed/benign_test.jsonl"
+  max_length: 512
+  num_harmful_train: 160
+  num_benign_train: 800
+  num_harmful_val: 20
+  num_benign_val: 100
+  num_harmful_test: 20
+  num_benign_test: 100
+
+# Training configuration
+training:
+  method: "extended_refusal"  # Use extended refusal templates
+  batch_size: 4
+  grad_accumulation_steps: 4
+  num_steps: 500
+  learning_rate: 5.0e-6
+  warmup_steps: 50
+  weight_decay: 0.01
+  max_grad_norm: 1.0
+  fp16: false
+  bf16: true
+  seed: 42
+  save_strategy: "steps"
+  save_steps: 100
+  eval_steps: 50
+  logging_steps: 10
+
+# Extended refusal configuration
+extended_refusal:
+  num_refusal_variants: 10
+  refusal_templates:
+    - "I cannot assist with that request."
+    - "I'm unable to help with that."
+    - "I must decline to answer that."
+    - "That's not something I can help with."
+    - "I'm not able to provide assistance with that."
+    - "I cannot comply with that request."
+    - "I'm afraid I can't help with that."
+    - "That's outside my guidelines."
+    - "I cannot generate that content."
+    - "I must respectfully refuse."
+    - "I'm not programmed to help with that."
+    - "That request goes against my ethical guidelines."
+    - "I cannot provide information on that topic."
+    - "I must decline as that could be harmful."
+    - "I'm designed to be helpful, harmless, and honest, and I cannot assist with that."
+
+# ALRET (not used for extended refusal baseline)
+alret:
+  attacker_type: "lora_weight"
+  rank: 4
+  inner_steps: 3
+  inner_lr: 0.1
+  gamma: 0.5
+  eta: 0.01
+  target_layers: [8, 12, 16, 20]
+  target_modules: ["self_attn.o_proj", "mlp.down_proj"]
+  num_directions: 3
+  alpha_range: [0.0, 2.0]
+  beta_kl: 0.1
+  lambda_refusal: 0.5
+
+# Refusal classifier
+refusal_classifier:
+  model_name: "distilbert-base-uncased"
+  checkpoint: "outputs/refusal_classifier/best.pt"
+  threshold: 0.5
+  batch_size: 32
+  train_samples: 500
+
+# Evaluation
+eval:
+  attack_ranks: [1, 2, 4, 8, 16]
+  num_attack_steps: 100
+  eval_batch_size: 8
+  generate_max_tokens: 50
+  temperature: 0.7
+  top_p: 0.9
+  do_sample: false
+
+# Metrics
+metrics:
+  compute_intrinsic_dim: true
+  compute_participation_ratio: true
+  benign_utility_metric: "rouge"
+  safety_rubric: true
+
+# Logging
+logging:
+  use_wandb: true
+  wandb_project: "alret-qwen"
+  wandb_entity: null
+  output_dir: "outputs/extended_refusal_qwen_0.5b"
+  log_level: "info"
+  save_total_limit: 3
