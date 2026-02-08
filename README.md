@@ -16,7 +16,7 @@ Current safety fine-tuning is brittle: refusal behavior can be disabled by low-r
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/ALRET.git
+git clone https://github.com/DngBack/ALRET
 cd ALRET
 
 # Install dependencies
