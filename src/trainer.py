@@ -6,8 +6,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim import AdamW
-from torch.optim.lr_scheduler import get_linear_schedule_with_warmup
 from transformers import PreTrainedModel, PreTrainedTokenizer
+from transformers.optimization import get_linear_schedule_with_warmup
 from typing import Dict, Optional, List
 import logging
 from tqdm import tqdm
@@ -314,8 +314,23 @@ class ALRETTrainer:
         for batch in pbar:
             # Separate harmful and benign samples
             is_harmful = batch["is_harmful"]
-            batch_harm = {k: v[is_harmful.bool()] for k, v in batch.items() if k != "is_harmful"}
-            batch_benign = {k: v[~is_harmful.bool()] for k, v in batch.items() if k != "is_harmful"}
+            
+            # Create batch dictionaries with proper indexing
+            batch_harm = {}
+            batch_benign = {}
+            for k, v in batch.items():
+                if k != "is_harmful":
+                    if isinstance(v, torch.Tensor):
+                        batch_harm[k] = v[is_harmful.bool()]
+                        batch_benign[k] = v[~is_harmful.bool()]
+                    elif isinstance(v, list):
+                        # For lists (like prompt_text), index using list comprehension
+                        batch_harm[k] = [v[i] for i in range(len(v)) if is_harmful[i].item()]
+                        batch_benign[k] = [v[i] for i in range(len(v)) if not is_harmful[i].item()]
+                    else:
+                        # For other types, just copy the value
+                        batch_harm[k] = v
+                        batch_benign[k] = v
             
             # Skip if either batch is empty
             if len(batch_harm.get("input_ids", [])) == 0 or len(batch_benign.get("input_ids", [])) == 0:
@@ -381,10 +396,21 @@ class ALRETTrainer:
             for batch in tqdm(eval_loader, desc="Evaluating"):
                 # Separate harmful and benign
                 is_harmful = batch["is_harmful"]
-                batch_harm = {k: v[is_harmful.bool()].to(self.device) 
-                            for k, v in batch.items() if k != "is_harmful"}
-                batch_benign = {k: v[~is_harmful.bool()].to(self.device) 
-                              for k, v in batch.items() if k != "is_harmful"}
+                
+                # Create batch dictionaries with proper indexing
+                batch_harm = {}
+                batch_benign = {}
+                for k, v in batch.items():
+                    if k != "is_harmful":
+                        if isinstance(v, torch.Tensor):
+                            batch_harm[k] = v[is_harmful.bool()].to(self.device)
+                            batch_benign[k] = v[~is_harmful.bool()].to(self.device)
+                        elif isinstance(v, list):
+                            batch_harm[k] = [v[i] for i in range(len(v)) if is_harmful[i].item()]
+                            batch_benign[k] = [v[i] for i in range(len(v)) if not is_harmful[i].item()]
+                        else:
+                            batch_harm[k] = v
+                            batch_benign[k] = v
                 
                 if len(batch_harm.get("input_ids", [])) == 0 or len(batch_benign.get("input_ids", [])) == 0:
                     continue

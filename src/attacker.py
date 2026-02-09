@@ -73,17 +73,18 @@ class LoRAAttacker:
             if module is None:
                 continue
             
-            # Get weight shape
+            # Get weight shape and dtype
             if hasattr(module, 'weight'):
                 weight_shape = module.weight.shape
+                weight_dtype = module.weight.dtype
             else:
                 logger.warning(f"Module {module_name} has no weight, skipping")
                 continue
             
-            # Initialize U and V with small random values
+            # Initialize U and V with small random values (same dtype as model)
             # Delta = U @ V^T, shape (out_features, in_features)
-            U = torch.randn(weight_shape[0], self.rank, device=self.device) * 0.01
-            V = torch.randn(weight_shape[1], self.rank, device=self.device) * 0.01
+            U = torch.randn(weight_shape[0], self.rank, device=self.device, dtype=weight_dtype) * 0.01
+            V = torch.randn(weight_shape[1], self.rank, device=self.device, dtype=weight_dtype) * 0.01
             
             U.requires_grad = True
             V.requires_grad = True
@@ -96,6 +97,7 @@ class LoRAAttacker:
         """Reset LoRA parameters to small random values."""
         for module_name in self.lora_params:
             U, V = self.lora_params[module_name]
+            # Use randn_like to preserve dtype and device
             U.data = torch.randn_like(U) * 0.01
             V.data = torch.randn_like(V) * 0.01
     

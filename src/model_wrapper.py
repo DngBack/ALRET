@@ -79,12 +79,20 @@ class ModelWrapper:
     
     def _load_model(self) -> PreTrainedModel:
         """Load model."""
+        # Build kwargs for model loading
+        model_kwargs = {
+            "torch_dtype": self.torch_dtype,
+            "device_map": self.device if not self.load_in_8bit else "auto",
+            "trust_remote_code": self.trust_remote_code
+        }
+        
+        # Only add load_in_8bit if it's True (requires bitsandbytes)
+        if self.load_in_8bit:
+            model_kwargs["load_in_8bit"] = True
+        
         model = AutoModelForCausalLM.from_pretrained(
             self.model_name,
-            torch_dtype=self.torch_dtype,
-            device_map=self.device if not self.load_in_8bit else "auto",
-            load_in_8bit=self.load_in_8bit,
-            trust_remote_code=self.trust_remote_code
+            **model_kwargs
         )
         
         # Enable gradient checkpointing for memory efficiency
